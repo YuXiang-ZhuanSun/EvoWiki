@@ -41,26 +41,121 @@ git clone https://github.com/YuXiang-ZhuanSun/EvoWiki.git
 cd EvoWiki
 ```
 
-### 1.3 第一次 Ingest（示例流程）
+### 1.3 核心工作流速览
 
-**Step 1**：找一篇你最近在看的文章，保存为 Markdown 文件放入 `raw/`：
+EvoWiki 只有三个操作：**Ingest（摄入）**、**Query（查询）**、**Lint（检查）**。下面给你一个完整跑通的例子。
+
+---
+
+#### Step 1：Ingest —— 把资料编译进知识库
+
+**① 准备资料**
+
+找一篇你最近在看的文章，保存为 Markdown 放入 `raw/`：
 
 ```bash
-# 假设你有一篇文章
 cp ~/Downloads/my_article.md raw/2026-05-17_my_article.md
 ```
 
-**Step 2**：告诉你的 LLM Agent：
+> 命名建议：`日期_简短描述.md`，方便后续追溯。
+
+**② 执行 Ingest**
+
+告诉你的 LLM Agent：
 
 > "请 ingest 这份资料：raw/2026-05-17_my_article.md"
 
-**Step 3**：LLM 会：
-1. 读文章，提取关键信息
-2. **和你讨论**："我发现三个实体、两个新概念，是否创建页面？"
-3. 你确认后，自动写入 `wiki/`
-4. 更新索引、日志，并做迷你检查
+**③ 人机讨论**
 
-**Step 4**：打开 `wiki/` 查看生成的知识网络。
+LLM 读完会向你汇报：
+
+```
+我提取了以下内容，请确认：
+- 实体：Ashish Vaswani（作者）、Google Brain（机构）→ 创建？
+- 概念：Self-Attention（新概念）、Multi-Head Attention（新概念）→ 创建？
+- 关系：与现有 wiki/concepts/rnn.md 有对比 → 更新关系页？
+- 领域：[nlp, deep_learning]
+```
+
+你回复：
+
+> "都创建。关系页也建一个。"
+
+**④ LLM 自动写入**
+
+确认后，LLM 会自动生成：
+- `wiki/sources/2026-05-17_my_article.md` —— 资料摘要
+- `wiki/entities/ashish_vaswani.md`、`wiki/entities/google_brain.md` —— 实体页
+- `wiki/concepts/self_attention.md`、`wiki/concepts/multi_head_attention.md` —— 概念页
+- `wiki/relations/attention_vs_rnn.md` —— 关系页（如有）
+- 更新 `wiki/index.md` 和 `wiki/log.md`
+
+**⑤ 检查结果**
+
+LLM 会汇报迷你 lint 结果：
+
+> "本次写入完成。检查了 3 个相关页面，未发现矛盾。新页面状态均为 draft，建议你抽空 review。"
+
+---
+
+#### Step 2：Query —— 向知识库提问
+
+资料入库后，直接向 LLM 提问：
+
+> "Self-Attention 和 RNN 的核心区别是什么？"
+
+LLM 的执行过程（你不用管，但你知道它在干嘛）：
+1. 读 `wiki/index.md` 找到相关页面
+2. 读 `wiki/concepts/self_attention.md` 和 `wiki/concepts/rnn.md`
+3. 读 `wiki/relations/attention_vs_rnn.md`（如果存在）
+4. 综合回答，并带上引用：
+
+```
+根据 [[Self-Attention]] 的定义，它的核心优势是...
+相比之下，[[RNN]] 的局限在于...（见 [[attention_vs_rnn]]）
+```
+
+**如果回答产生了新洞察**，LLM 会问：
+
+> "这个对比中我发现了一个新角度：A 和 B 在并行计算上其实是互补的。要不要保存为 wiki/relations/attention_rnn_complement.md？"
+
+**建议你同意。** 这样你的提问也能反哺知识库。
+
+---
+
+#### Step 3：Lint —— 定期健康检查
+
+当你积累了一定内容后（比如 ingest 了 5~10 篇），对 LLM 说：
+
+> "请对 wiki 做一次全面 lint。"
+
+LLM 会扫描整个知识库，生成报告：
+
+```markdown
+## Lint 报告
+
+- 🔍 矛盾：[[entities/gpt_4]] 说参数量 1.8T，[[relations/llm_scaling]] 说 8×220B
+- 🔗 孤儿页：[[concepts/speculative_decoding]] 没有任何页面链接到它
+- 🕳️ 概念缺口："Mixture of Experts" 被 5 个页面提及，但没有独立页面
+```
+
+**你确认修复方案后**，LLM 执行修改，并追加到 `wiki/log.md`。
+
+> 日常每次 ingest 后，LLM 会自动做"迷你 lint"（只检查本次涉及的内容）。全面 lint 建议每 10 篇 ingest 做一次。
+
+---
+
+### 1.4 一句话总结
+
+| 你想做什么 | 对 LLM 说什么 |
+|-----------|-------------|
+| 加新资料 | "请 ingest raw/xxx.md" |
+| 问问题 | 直接问，LLM 会自动查 wiki |
+| 检查健康 | "请 lint wiki" |
+| 查看总览 | 打开 `wiki/index.md` |
+| 查看历史 | 打开 `wiki/log.md` |
+
+**你的日常就是：丢资料 → 讨论 → 提问 → 偶尔 lint。LLM 负责其他所有事情。**
 
 ---
 
